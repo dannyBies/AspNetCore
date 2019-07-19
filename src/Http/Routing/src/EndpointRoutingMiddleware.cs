@@ -116,6 +116,8 @@ namespace Microsoft.AspNetCore.Routing
             {
                 // This allows a second call in a single request (such as from the ErrorHandlerMiddleware) to perform routing again.
                 httpContext.SetEndpoint(endpoint: null);
+
+                httpContext.Request.RouteValues?.Clear();
             }
         }
 
