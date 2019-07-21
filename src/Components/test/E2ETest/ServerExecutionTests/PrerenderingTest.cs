@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using BasicTestApp;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure;
 using Microsoft.AspNetCore.Components.E2ETest.Infrastructure.ServerFixtures;
 using Microsoft.AspNetCore.E2ETesting;
@@ -10,16 +11,15 @@ using Xunit.Abstractions;
 
 namespace Microsoft.AspNetCore.Components.E2ETest.ServerExecutionTests
 {
-    public class PrerenderingTest : ServerTestBase<AspNetSiteServerFixture>
+    [Collection("auth")] // Because auth uses cookies, this can't run in parallel with other auth tests
+    public class PrerenderingTest : BasicTestAppTestBase
     {
         public PrerenderingTest(
             BrowserFixture browserFixture,
-            AspNetSiteServerFixture serverFixture,
+            ToggleExecutionModeServerFixture<Program> serverFixture,
             ITestOutputHelper output)
-            : base(browserFixture, serverFixture, output)
+            : base(browserFixture, serverFixture.WithServerExecution(), output)
         {
-            _serverFixture.Environment = AspNetEnvironment.Development;
-            _serverFixture.BuildWebHostMethod = TestServer.Program.BuildWebHost;
         }
 
         [Fact]
@@ -73,6 +73,24 @@ namespace Microsoft.AspNetCore.Components.E2ETest.ServerExecutionTests
             Browser.Equal(
                 _serverFixture.RootUri + url,
                 () => Browser.FindElement(By.TagName("strong")).Text);
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData(null, "Bert")]
+        [InlineData("Bert", null)]
+        [InlineData("Bert", "Treb")]
+        public void CanAccessAuthenticationStateDuringStaticPrerendering(string initialUsername, string interactiveUsername)
+        {
+            // See that the authentication state is usable during the initial prerendering
+            SignInAs(initialUsername, null);
+            Navigate("/prerendered/prerendered-transition");
+            Browser.Equal($"Hello, {initialUsername ?? "anonymous"}!", () => Browser.FindElement(By.TagName("h1")).Text);
+
+            // See that during connection, we update to whatever the latest authentication state now is
+            SignInAs(interactiveUsername, null, useSeparateTab: true);
+            BeginInteractivity();
+            Browser.Equal($"Hello, {interactiveUsername ?? "anonymous"}!", () => Browser.FindElement(By.TagName("h1")).Text);
         }
 
         private void BeginInteractivity()
